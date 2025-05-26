@@ -5,8 +5,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Variáveis para armazenar a posição X e Y da bolinha
     // Inicia no centro da tela
-    let posX = window.innerWidth / 2;
-    let posY = window.innerHeight / 2;
+    let posX = window.innerWidth / 50;
+    let posY = window.innerHeight / 50;
     
     // Velocidade de movimento da bolinha (em pixels por frame)
     const velocidade = 10;
