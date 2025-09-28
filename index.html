@@ -3,46 +3,116 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bolinha e Fantasmas</title>
-    <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #f0f0f0;
-        }
-        
-        #gameArea {
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-        }
-        
-        .bolinha {
-            position: absolute;
-            width: 50px;
-            height: 50px;
-            user-select: none;
-            z-index: 2;
-        }
-        
-        .fantasma {
-            position: absolute;
-            width: 60px;
-            height: 60px;
-            user-select: none;
-            transition: transform 0.2s;
-            z-index: 1;
-        }
-    </style>
+    <title>Visualizador de Funções Trigonométricas</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.min.js"></script>
 </head>
 <body>
-    <div id="gameArea">
-        <!-- Elementos serão adicionados via JavaScript -->
+    <div class="container">
+        <header class="header">
+            <h1 class="title">Visualizador de Funções Trigonométricas</h1>
+            <p class="subtitle">Explore e compreenda as transformações de seno e cosseno</p>
+        </header>
+
+        <main class="main-content">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="function-input" class="input-label">Digite sua função:</label>
+                    <div class="input-container">
+                        <input 
+                            type="text" 
+                            id="function-input" 
+                            class="function-input" 
+                            placeholder="Ex: sen(2x), -cos(x+2), 3*sen(x/2-1)+2"
+                            value="sen(x)"
+                        >
+                        <button id="plot-button" class="plot-button">Plotar Gráfico</button>
+                    </div>
+                    <div class="input-help">
+                        <p><strong>Exemplos válidos:</strong></p>
+                        <ul>
+                            <li><code>sen(x)</code> - função seno padrão</li>
+                            <li><code>cos(x)</code> - função cosseno padrão</li>
+                            <li><code>2*sen(x)</code> - amplitude 2</li>
+                            <li><code>sen(2x)</code> - período π</li>
+                            <li><code>sen(x-1)</code> - deslocamento horizontal</li>
+                            <li><code>sen(x)+2</code> - deslocamento vertical</li>
+                            <li><code>-cos(3x+2)-1</code> - função complexa</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="presets-section">
+                    <h3>Funções Pré-definidas:</h3>
+                    <div class="preset-buttons">
+                        <button class="preset-btn" data-function="sen(x)">sen(x)</button>
+                        <button class="preset-btn" data-function="cos(x)">cos(x)</button>
+                        <button class="preset-btn" data-function="2*sen(x)">2*sen(x)</button>
+                        <button class="preset-btn" data-function="sen(2x)">sen(2x)</button>
+                        <button class="preset-btn" data-function="sen(x/2)">sen(x/2)</button>
+                        <button class="preset-btn" data-function="sen(x-1)">sen(x-1)</button>
+                        <button class="preset-btn" data-function="sen(x)+2">sen(x)+2</button>
+                        <button class="preset-btn" data-function="-cos(x)">-cos(x)</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="visualization-section">
+                <div class="chart-container">
+                    <canvas id="function-chart"></canvas>
+                </div>
+                
+                <div class="analysis-panel">
+                    <div class="analysis-header">
+                        <h3>Análise da Função</h3>
+                    </div>
+                    <div id="function-analysis" class="analysis-content">
+                        <p>Digite uma função para ver a análise detalhada.</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="comparison-section">
+                <div class="comparison-header">
+                    <h3>Comparação com a Função Padrão</h3>
+                </div>
+                <div id="comparison-content" class="comparison-content">
+                    <p>A comparação aparecerá aqui após plotar uma função.</p>
+                </div>
+            </div>
+
+            <div class="info-section">
+                <div class="info-card">
+                    <h3>Como usar</h3>
+                    <ol>
+                        <li>Digite uma função trigonométrica no campo acima</li>
+                        <li>Use <code>sen()</code> para seno e <code>cos()</code> para cosseno</li>
+                        <li>Clique em "Plotar Gráfico" ou pressione Enter</li>
+                        <li>Observe o gráfico e leia a análise detalhada</li>
+                        <li>Compare com a função padrão destacada em cinza</li>
+                    </ol>
+                </div>
+
+                <div class="info-card">
+                    <h3>Transformações Suportadas</h3>
+                    <ul>
+                        <li><strong>Amplitude:</strong> <code>A*sen(x)</code> - altera a altura máxima</li>
+                        <li><strong>Período:</strong> <code>sen(Bx)</code> - altera a frequência</li>
+                        <li><strong>Deslocamento horizontal:</strong> <code>sen(x-C)</code> - move para direita/esquerda</li>
+                        <li><strong>Deslocamento vertical:</strong> <code>sen(x)+D</code> - move para cima/baixo</li>
+                        <li><strong>Reflexão:</strong> <code>-sen(x)</code> - inverte o gráfico</li>
+                    </ul>
+                </div>
+            </div>
+        </main>
+
+        <footer class="footer">
+            <p>&copy; 2025 Visualizador de Funções Trigonométricas</p>
+        </footer>
     </div>
 
-    <!-- Arquivos JavaScript separados -->
-    <script src="bolinha.js"></script>
-    <script src="fantasma.js"></script>
-    <script src="main.js"></script>
+    <script src="script.js"></script>
 </body>
 </html>
