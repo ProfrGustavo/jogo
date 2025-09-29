@@ -1,8 +1,9 @@
+// Visualizador de Funções Trigonométricas - Versão Aprimorada
 // Variáveis globais
 let chart = null;
 let currentFunction = 'sen(x)';
 
-// Inicialização quando a página carrega
+// Inicialização
 document.addEventListener('DOMContentLoaded', function() {
     initializeApp();
 });
@@ -16,26 +17,19 @@ function setupEventListeners() {
     const input = document.getElementById('function-input');
     const plotButton = document.getElementById('plot-button');
     const presetButtons = document.querySelectorAll('.preset-btn');
+    const clearButton = document.getElementById('clear-button');
 
-    // Event listener para o botão de plotar
-    plotButton.addEventListener('click', () => {
-        const functionText = input.value.trim();
-        if (functionText) {
-            plotFunction(functionText);
-        }
-    });
-
-    // Event listener para Enter no input
+    // Botão plotar
+    plotButton.addEventListener('click', handlePlotClick);
+    
+    // Enter no input
     input.addEventListener('keypress', (e) => {
         if (e.key === 'Enter') {
-            const functionText = input.value.trim();
-            if (functionText) {
-                plotFunction(functionText);
-            }
+            handlePlotClick();
         }
     });
 
-    // Event listeners para botões pré-definidos
+    // Botões pré-definidos
     presetButtons.forEach(button => {
         button.addEventListener('click', () => {
             const functionText = button.getAttribute('data-function');
@@ -43,19 +37,45 @@ function setupEventListeners() {
             plotFunction(functionText);
         });
     });
+
+    // Botão limpar
+    if (clearButton) {
+        clearButton.addEventListener('click', () => {
+            input.value = '';
+            input.focus();
+        });
+    }
+}
+
+function handlePlotClick() {
+    const input = document.getElementById('function-input');
+    const functionText = input.value.trim();
+    
+    if (!functionText) {
+        showError('Por favor, digite uma função trigonométrica.');
+        return;
+    }
+    
+    plotFunction(functionText);
 }
 
 function plotFunction(functionText) {
     try {
-        currentFunction = functionText;
+        // Limpar erros anteriores
+        clearError();
         
-        // Parse da função
+        // Parse da função com validação aprimorada
         const parsedFunction = parseFunction(functionText);
+        
+        if (!parsedFunction.isValid) {
+            throw new Error(parsedFunction.error || 'Função inválida');
+        }
         
         // Gerar dados para o gráfico
         const data = generatePlotData(parsedFunction);
         
-        // Criar/atualizar gráfico
+        // Criar/atualizar gráfico com destruição completa
+        destroyChart();
         createChart(data, functionText);
         
         // Analisar função
@@ -64,73 +84,92 @@ function plotFunction(functionText) {
         // Gerar comparação
         generateComparison(parsedFunction, functionText);
         
+        // Atualizar função atual
+        currentFunction = functionText;
+        
     } catch (error) {
         console.error('Erro ao plotar função:', error);
-        showError('Erro ao interpretar a função. Verifique a sintaxe e tente novamente.');
+        showError(error.message || 'Erro ao interpretar a função. Verifique a sintaxe.');
     }
 }
 
 function parseFunction(functionText) {
-    // Normalizar a entrada
-    let normalized = functionText.toLowerCase()
-        .replace(/\s+/g, '') // Remove espaços
-        .replace(/sen/g, 'sin') // Converte sen para sin
-        .replace(/cos/g, 'cos') // Mantém cos
-        .replace(/\^/g, '**'); // Converte ^ para **
+    try {
+        // Normalizar entrada
+        let normalized = functionText.toLowerCase()
+            .replace(/\s+/g, '') // Remove espaços
+            .replace(/sen/g, 'sin') // Converte sen para sin
+            .replace(/\^/g, '**') // Converte ^ para **
+            .replace(/π/g, 'pi') // Converte π para pi
+            .replace(/pi/g, Math.PI.toString()); // Converte pi para valor numérico
 
-    // Extrair parâmetros da função trigonométrica
-    const result = {
-        type: 'sin', // padrão
-        amplitude: 1,
-        frequency: 1,
-        phaseShift: 0,
-        verticalShift: 0,
-        isNegative: false,
-        originalFunction: functionText,
-        normalizedFunction: normalized
-    };
+        // Resultado padrão
+        const result = {
+            type: 'sin',
+            amplitude: 1,
+            frequency: 1,
+            phaseShift: 0,
+            verticalShift: 0,
+            originalFunction: functionText,
+            normalizedFunction: normalized,
+            isValid: true,
+            error: null
+        };
 
-    // Detectar se é negativo no início
-    if (normalized.startsWith('-')) {
-        result.isNegative = true;
-        normalized = normalized.substring(1);
-    }
+        // Validação básica
+        if (!normalized.includes('sin') && !normalized.includes('cos')) {
+            result.isValid = false;
+            result.error = 'Função deve conter sen() ou cos()';
+            return result;
+        }
 
-    // Detectar tipo de função (sin ou cos)
-    if (normalized.includes('cos')) {
-        result.type = 'cos';
-    }
+        // Detectar tipo de função
+        if (normalized.includes('cos')) {
+            result.type = 'cos';
+        }
 
-    // Extrair amplitude (coeficiente antes da função)
-    const amplitudeMatch = normalized.match(/^(\d*\.?\d*)\*/);
-    if (amplitudeMatch && amplitudeMatch[1]) {
-        result.amplitude = parseFloat(amplitudeMatch[1]);
-        normalized = normalized.replace(/^\d*\.?\d*\*/, '');
-    }
-
-    // Extrair o conteúdo dentro dos parênteses
-    const innerMatch = normalized.match(/(sin|cos)\(([^)]+)\)/);
-    if (innerMatch) {
-        const innerExpression = innerMatch[2];
+        // Padrão de função trigonométrica: A*func(B*x + C) + D
+        // Onde A = amplitude, B = frequência, C = deslocamento de fase, D = deslocamento vertical
         
-        // Analisar a expressão interna: ax + b ou ax - b
-        const innerParts = parseInnerExpression(innerExpression);
-        result.frequency = innerParts.frequency;
-        result.phaseShift = innerParts.phaseShift;
-    }
+        // Extrair deslocamento vertical (último termo)
+        const verticalMatch = normalized.match(/([+-]\d*\.?\d+)(?!.*[sincos])/);
+        if (verticalMatch) {
+            result.verticalShift = parseFloat(verticalMatch[1]);
+            normalized = normalized.replace(verticalMatch[0], '');
+        }
 
-    // Extrair deslocamento vertical (+ ou - no final)
-    const verticalMatch = normalized.match(/([+-]\d*\.?\d*)$/);
-    if (verticalMatch) {
-        result.verticalShift = parseFloat(verticalMatch[1]);
-    }
+        // Extrair amplitude (coeficiente antes da função)
+        let amplitudeMatch = normalized.match(/^([+-]?\d*\.?\d*)\*?(sin|cos)/);
+        if (amplitudeMatch && amplitudeMatch[1]) {
+            if (amplitudeMatch[1] === '' || amplitudeMatch[1] === '+') {
+                result.amplitude = 1;
+            } else if (amplitudeMatch[1] === '-') {
+                result.amplitude = -1;
+            } else {
+                result.amplitude = parseFloat(amplitudeMatch[1]);
+            }
+        } else if (normalized.startsWith('-')) {
+            result.amplitude = -1;
+        }
 
-    // Aplicar sinal negativo à amplitude
-    if (result.isNegative) {
-        result.amplitude = -result.amplitude;
-    }
+        // Extrair conteúdo dos parênteses
+        const innerMatch = normalized.match(/(sin|cos)\(([^)]+)\)/);
+        if (innerMatch) {
+            const innerExpression = innerMatch[2];
+            const innerParts = parseInnerExpression(innerExpression);
+            result.frequency = innerParts.frequency;
+            result.phaseShift = innerParts.phaseShift;
+        }
 
-    return result;
+        return result;
+
+    } catch (error) {
+        return {
+            isValid: false,
+            error: 'Erro ao analisar a função: ' + error.message,
+            originalFunction: functionText
+        };
+    }
 }
 
 function parseInnerExpression(expr) {
@@ -139,39 +178,40 @@ function parseInnerExpression(expr) {
     // Remover espaços
     expr = expr.replace(/\s+/g, '');
     
-    // Casos especiais
+    // Caso simples: apenas x
     if (expr === 'x') {
         return result;
     }
     
-    // Padrão: coeficiente*x + constante ou coeficiente*x - constante
-    // Primeiro, extrair o coeficiente de x
-    let freqMatch = expr.match(/^(\d*\.?\d*)x/);
-    if (freqMatch) {
-        if (freqMatch[1] === '' || freqMatch[1] === '+') {
-            result.frequency = 1;
-        } else if (freqMatch[1] === '-') {
-            result.frequency = -1;
+    // Dividir em termos
+    const terms = expr.split(/([+-])/);
+    let xCoeff = 0;
+    let constant = 0;
+    
+    for (let i = 0; i < terms.length; i++) {
+        const term = terms[i].trim();
+        
+        if (term === '+' || term === '-' || term === '') continue;
+        
+        const sign = (i > 0 && terms[i-1] === '-') ? -1 : 1;
+        
+        if (term.includes('x')) {
+            // Termo com x
+            const coeffMatch = term.match(/^([+-]?\d*\.?\d*)x?/);
+            if (coeffMatch) {
+                let coeff = coeffMatch[1];
+                if (coeff === '' || coeff === '+') coeff = '1';
+                if (coeff === '-') coeff = '-1';
+                xCoeff += sign * parseFloat(coeff);
+            }
         } else {
-            result.frequency = parseFloat(freqMatch[1]);
-        }
-    } else if (expr.match(/^x/)) {
-        result.frequency = 1;
-    } else {
-        // Caso onde não há x explícito, como em "2" (seria 2*x)
-        const numMatch = expr.match(/^(\d*\.?\d*)$/);
-        if (numMatch && numMatch[1]) {
-            result.frequency = parseFloat(numMatch[1]);
+            // Termo constante
+            constant += sign * parseFloat(term);
         }
     }
     
-    // Extrair a constante (deslocamento de fase)
-    const constMatch = expr.match(/([+-]\d*\.?\d*)$/);
-    if (constMatch) {
-        const constValue = parseFloat(constMatch[1]);
-        // O deslocamento de fase é -C/B onde a expressão é B(x - C)
-        result.phaseShift = -constValue / result.frequency;
-    }
+    result.frequency = xCoeff || 1;
+    result.phaseShift = -constant / result.frequency;
     
     return result;
 }
@@ -180,17 +220,22 @@ function generatePlotData(parsedFunction) {
     const points = [];
     const standardPoints = [];
     
-    // Determinar o range baseado na frequência para mostrar pelo menos 2 períodos completos
+    // Determinar range baseado na frequência
     const period = (2 * Math.PI) / Math.abs(parsedFunction.frequency);
-    const range = Math.max(4 * Math.PI, 2 * period);
-    const step = range / 500; // 500 pontos para suavidade
+    const range = Math.max(4 * Math.PI, 3 * period);
+    const numPoints = 1000; // Mais pontos para suavidade
+    const step = range / numPoints;
     
-    for (let x = -range/2; x <= range/2; x += step) {
+    for (let i = 0; i <= numPoints; i++) {
+        const x = -range/2 + i * step;
+        
         // Função personalizada
         const y = calculateFunctionValue(x, parsedFunction);
-        points.push({ x: x, y: y });
+        if (isFinite(y)) { // Verificar se é um número válido
+            points.push({ x: x, y: y });
+        }
         
-        // Função padrão para comparação
+        // Função padrão
         const standardY = parsedFunction.type === 'sin' ? Math.sin(x) : Math.cos(x);
         standardPoints.push({ x: x, y: standardY });
     }
@@ -198,17 +243,18 @@ function generatePlotData(parsedFunction) {
     return {
         userFunction: points,
         standardFunction: standardPoints,
-        range: range
+        range: range,
+        period: period
     };
 }
 
 function calculateFunctionValue(x, params) {
     const { type, amplitude, frequency, phaseShift, verticalShift } = params;
     
-    // Calcular o argumento da função trigonométrica
+    // Calcular argumento
     const argument = frequency * (x - phaseShift);
     
-    // Calcular o valor base
+    // Calcular valor base
     let baseValue;
     if (type === 'sin') {
         baseValue = Math.sin(argument);
@@ -220,46 +266,65 @@ function calculateFunctionValue(x, params) {
     return amplitude * baseValue + verticalShift;
 }
 
-function createChart(data, functionText) {
-    const ctx = document.getElementById('function-chart').getContext('2d');
-    
-    // Destruir gráfico anterior se existir
+function destroyChart() {
     if (chart) {
         chart.destroy();
+        chart = null;
+    }
+}
+
+function createChart(data, functionText) {
+    const ctx = document.getElementById('function-chart');
+    if (!ctx) {
+        console.error('Canvas não encontrado');
+        return;
     }
     
-    // Configurar dados do gráfico
+    // Limpar canvas
+    ctx.getContext('2d').clearRect(0, 0, ctx.width, ctx.height);
+    
+    // Determinar limites do eixo Y
+    const allYValues = data.userFunction.map(p => p.y);
+    const minY = Math.min(...allYValues);
+    const maxY = Math.max(...allYValues);
+    const yPadding = Math.max(1, (maxY - minY) * 0.1);
+    
     const chartData = {
         datasets: [
             {
-                label: `Função padrão (${data.userFunction[0] && data.userFunction[0].y !== undefined ? 'sin(x)' : 'cos(x)'})`,
+                label: `Função padrão (${data.userFunction.length > 0 ? (data.userFunction[0].y !== undefined ? 'sin(x)' : 'cos(x)') : 'sin(x)'})`,
                 data: data.standardFunction,
-                borderColor: 'rgba(156, 163, 175, 0.8)',
-                backgroundColor: 'rgba(156, 163, 175, 0.1)',
-                borderWidth: 2,
+                borderColor: 'rgba(156, 163, 175, 0.6)',
+                backgroundColor: 'transparent',
+                borderWidth: 1.5,
                 fill: false,
                 pointRadius: 0,
-                borderDash: [5, 5]
+                borderDash: [8, 4],
+                tension: 0
             },
             {
                 label: functionText,
                 data: data.userFunction,
-                borderColor: 'rgba(37, 99, 235, 1)',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                borderColor: '#3b82f6',
+                backgroundColor: 'rgba(59, 130, 246, 0.1)',
                 borderWidth: 3,
                 fill: false,
-                pointRadius: 0
+                pointRadius: 0,
+                tension: 0
             }
         ]
     };
     
-    // Configurações do gráfico
     const config = {
         type: 'line',
         data: chartData,
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            animation: {
+                duration: 800,
+                easing: 'easeInOutQuart'
+            },
             interaction: {
                 intersect: false,
                 mode: 'index'
@@ -271,17 +336,19 @@ function createChart(data, functionText) {
                         usePointStyle: true,
                         padding: 20,
                         font: {
-                            size: 12,
-                            family: 'Inter'
+                            size: 13,
+                            family: 'system-ui, -apple-system, sans-serif',
+                            weight: '500'
                         }
                     }
                 },
                 tooltip: {
-                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                    titleColor: 'white',
-                    bodyColor: 'white',
-                    borderColor: 'rgba(37, 99, 235, 1)',
+                    backgroundColor: 'rgba(17, 24, 39, 0.95)',
+                    titleColor: '#f9fafb',
+                    bodyColor: '#f9fafb',
+                    borderColor: '#3b82f6',
                     borderWidth: 1,
+                    cornerRadius: 8,
                     callbacks: {
                         label: function(context) {
                             return `${context.dataset.label}: (${context.parsed.x.toFixed(3)}, ${context.parsed.y.toFixed(3)})`;
@@ -293,166 +360,158 @@ function createChart(data, functionText) {
                 x: {
                     type: 'linear',
                     position: 'center',
+                    min: -data.range/2,
+                    max: data.range/2,
                     title: {
                         display: true,
                         text: 'x (radianos)',
                         font: {
                             size: 14,
-                            weight: 'bold'
-                        }
+                            weight: '600'
+                        },
+                        color: '#374151'
                     },
                     grid: {
-                        color: 'rgba(0, 0, 0, 0.1)',
+                        color: 'rgba(156, 163, 175, 0.3)',
                         lineWidth: 1
                     },
                     ticks: {
                         callback: function(value) {
-                            // Mostrar múltiplos de π/2
-                            const piMultiple = value / (Math.PI / 2);
-                            if (Math.abs(piMultiple - Math.round(piMultiple)) < 0.1) {
-                                const rounded = Math.round(piMultiple);
-                                if (rounded === 0) return '0';
-                                if (rounded === 1) return 'π/2';
-                                if (rounded === -1) return '-π/2';
-                                if (rounded === 2) return 'π';
-                                if (rounded === -2) return '-π';
-                                if (rounded % 2 === 0) return `${rounded/2}π`;
-                                return `${rounded}π/2`;
+                            const piValue = value / Math.PI;
+                            if (Math.abs(piValue) < 0.01) return '0';
+                            if (Math.abs(piValue - 1) < 0.1) return 'π';
+                            if (Math.abs(piValue + 1) < 0.1) return '-π';
+                            if (Math.abs(piValue - 0.5) < 0.05) return 'π/2';
+                            if (Math.abs(piValue + 0.5) < 0.05) return '-π/2';
+                            if (Math.abs(piValue - 2) < 0.1) return '2π';
+                            if (Math.abs(piValue + 2) < 0.1) return '-2π';
+                            if (Math.abs(piValue % 1) < 0.1) {
+                                const rounded = Math.round(piValue);
+                                return rounded === 0 ? '0' : `${rounded}π`;
                             }
                             return '';
                         },
-                        maxTicksLimit: 15
+                        maxTicksLimit: 12,
+                        color: '#6b7280',
+                        font: {
+                            size: 12
+                        }
                     }
                 },
                 y: {
                     position: 'center',
+                    min: minY - yPadding,
+                    max: maxY + yPadding,
                     title: {
                         display: true,
                         text: 'y',
                         font: {
                             size: 14,
-                            weight: 'bold'
-                        }
+                            weight: '600'
+                        },
+                        color: '#374151'
                     },
                     grid: {
-                        color: 'rgba(0, 0, 0, 0.1)',
+                        color: 'rgba(156, 163, 175, 0.3)',
                         lineWidth: 1
                     },
                     ticks: {
-                        stepSize: 0.5
+                        stepSize: 0.5,
+                        color: '#6b7280',
+                        font: {
+                            size: 12
+                        }
                     }
-                }
-            },
-            elements: {
-                line: {
-                    tension: 0
                 }
             }
         }
     };
     
-    // Criar novo gráfico
     chart = new Chart(ctx, config);
 }
 
 function analyzeFunction(parsedFunction, functionText) {
     const analysisDiv = document.getElementById('function-analysis');
+    if (!analysisDiv) return;
     
     const { type, amplitude, frequency, phaseShift, verticalShift } = parsedFunction;
     
-    // Calcular propriedades derivadas
+    // Calcular propriedades
     const period = (2 * Math.PI) / Math.abs(frequency);
     const maxValue = Math.abs(amplitude) + verticalShift;
     const minValue = -Math.abs(amplitude) + verticalShift;
     
-    let html = `
-        <div class="parameter-grid">
-            <div class="parameter-item">
-                <div class="parameter-label">Função Original:</div>
-                <div class="parameter-value">${functionText}</div>
-                <div class="parameter-description">Função inserida pelo usuário</div>
+    const html = `
+        <div class="analysis-grid">
+            <div class="analysis-item">
+                <div class="analysis-label">Função</div>
+                <div class="analysis-value">${functionText}</div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Tipo:</div>
-                <div class="parameter-value">${type === 'sin' ? 'Seno' : 'Cosseno'}</div>
-                <div class="parameter-description">Função trigonométrica base</div>
+            <div class="analysis-item">
+                <div class="analysis-label">Tipo</div>
+                <div class="analysis-value">${type === 'sin' ? 'Seno' : 'Cosseno'}</div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Amplitude:</div>
-                <div class="parameter-value">${amplitude}</div>
-                <div class="parameter-description">
+            <div class="analysis-item">
+                <div class="analysis-label">Amplitude</div>
+                <div class="analysis-value">${amplitude}</div>
+                <div class="analysis-desc">
                     ${Math.abs(amplitude) === 1 ? 
-                        'Amplitude padrão - altura máxima de 1' : 
-                        `Amplitude ${Math.abs(amplitude) > 1 ? 'aumentada' : 'diminuída'} - altura máxima de ${Math.abs(amplitude)}`
+                        'Amplitude padrão' : 
+                        `Amplitude ${Math.abs(amplitude) > 1 ? 'aumentada' : 'diminuída'} ${Math.abs(amplitude)}x`
                     }
-                    ${amplitude < 0 ? ' (função invertida)' : ''}
+                    ${amplitude < 0 ? ' (invertida)' : ''}
                 </div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Frequência:</div>
-                <div class="parameter-value">${frequency}</div>
-                <div class="parameter-description">
-                    ${frequency === 1 ? 
-                        'Frequência padrão' : 
-                        frequency > 1 ? 
-                            `Função ${frequency}x mais rápida` : 
-                            `Função ${1/frequency}x mais lenta`
-                    }
-                </div>
-            </div>
-            
-            <div class="parameter-item">
-                <div class="parameter-label">Período:</div>
-                <div class="parameter-value">${period.toFixed(3)} rad (${(period * 180 / Math.PI).toFixed(1)}°)</div>
-                <div class="parameter-description">
+            <div class="analysis-item">
+                <div class="analysis-label">Período</div>
+                <div class="analysis-value">${period.toFixed(3)} rad</div>
+                <div class="analysis-desc">
                     ${period === 2 * Math.PI ? 
-                        'Período padrão de 2π' : 
+                        'Período padrão (2π)' : 
                         period > 2 * Math.PI ? 
-                            'Período aumentado - ciclo mais longo' : 
-                            'Período diminuído - ciclo mais curto'
+                            'Período aumentado' : 
+                            'Período diminuído'
                     }
                 </div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Deslocamento Horizontal:</div>
-                <div class="parameter-value">${phaseShift === 0 ? '0' : phaseShift.toFixed(3)} rad</div>
-                <div class="parameter-description">
+            <div class="analysis-item">
+                <div class="analysis-label">Deslocamento Horizontal</div>
+                <div class="analysis-value">${phaseShift === 0 ? '0' : phaseShift.toFixed(3)} rad</div>
+                <div class="analysis-desc">
                     ${phaseShift === 0 ? 
-                        'Sem deslocamento horizontal' : 
+                        'Sem deslocamento' : 
                         phaseShift > 0 ? 
-                            `Deslocado ${phaseShift.toFixed(3)} rad para a direita` : 
-                            `Deslocado ${Math.abs(phaseShift).toFixed(3)} rad para a esquerda`
+                            `${phaseShift.toFixed(3)} rad à direita` : 
+                            `${Math.abs(phaseShift).toFixed(3)} rad à esquerda`
                     }
                 </div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Deslocamento Vertical:</div>
-                <div class="parameter-value">${verticalShift === 0 ? '0' : verticalShift}</div>
-                <div class="parameter-description">
+            <div class="analysis-item">
+                <div class="analysis-label">Deslocamento Vertical</div>
+                <div class="analysis-value">${verticalShift === 0 ? '0' : verticalShift}</div>
+                <div class="analysis-desc">
                     ${verticalShift === 0 ? 
-                        'Sem deslocamento vertical' : 
+                        'Sem deslocamento' : 
                         verticalShift > 0 ? 
-                            `Deslocado ${verticalShift} unidades para cima` : 
-                            `Deslocado ${Math.abs(verticalShift)} unidades para baixo`
+                            `${verticalShift} unidades acima` : 
+                            `${Math.abs(verticalShift)} unidades abaixo`
                     }
                 </div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Valor Máximo:</div>
-                <div class="parameter-value">${maxValue}</div>
-                <div class="parameter-description">Ponto mais alto da função</div>
+            <div class="analysis-item">
+                <div class="analysis-label">Valor Máximo</div>
+                <div class="analysis-value">${maxValue}</div>
             </div>
             
-            <div class="parameter-item">
-                <div class="parameter-label">Valor Mínimo:</div>
-                <div class="parameter-value">${minValue}</div>
-                <div class="parameter-description">Ponto mais baixo da função</div>
+            <div class="analysis-item">
+                <div class="analysis-label">Valor Mínimo</div>
+                <div class="analysis-value">${minValue}</div>
             </div>
         </div>
     `;
@@ -462,285 +521,148 @@ function analyzeFunction(parsedFunction, functionText) {
 
 function generateComparison(parsedFunction, functionText) {
     const comparisonDiv = document.getElementById('comparison-content');
+    if (!comparisonDiv) return;
     
     const { type, amplitude, frequency, phaseShift, verticalShift } = parsedFunction;
     const standardFunction = type === 'sin' ? 'sen(x)' : 'cos(x)';
     
-    let comparison = `<p><strong>Comparando ${functionText} com ${standardFunction}:</strong></p>`;
+    let comparison = `<h4>Comparando ${functionText} com ${standardFunction}</h4>`;
     
-    // Análise da amplitude
+    // Análise detalhada da amplitude
     if (Math.abs(amplitude) !== 1) {
         if (amplitude < 0) {
-            comparison += `<p>• <span class="highlight-change">Amplitude alterada e função invertida</span>: A amplitude foi multiplicada por ${Math.abs(amplitude)} e a função foi refletida no eixo x. Enquanto ${standardFunction} varia entre -1 e 1, sua função varia entre ${-Math.abs(amplitude)} e ${Math.abs(amplitude)}, mas invertida.</p>`;
+            comparison += `<div class="explanation-block">
+                <p><strong>🔄 Amplitude e Inversão:</strong></p>
+                <p>Variamos o parâmetro A (amplitude) para ${amplitude}. Isso causa duas transformações:</p>
+                <p><span class="highlight-change">1. Amplitude:</span> A altura máxima mudou de 1 para ${Math.abs(amplitude)}. Isso significa que a função oscila ${Math.abs(amplitude)}x mais intensamente.</p>
+                <p><span class="highlight-change">2. Inversão:</span> O sinal negativo inverte completamente a função - onde ${standardFunction} sobe, sua função desce, e vice-versa.</p>
+                <p><em>Resultado:</em> Enquanto ${standardFunction} varia suavemente entre -1 e 1, sua função varia de forma invertida entre ${-Math.abs(amplitude)} e ${Math.abs(amplitude)}.</p>
+            </div>`;
         } else {
-            comparison += `<p>• <span class="highlight-change">Amplitude alterada</span>: A amplitude foi multiplicada por ${amplitude}. Enquanto ${standardFunction} varia entre -1 e 1, sua função varia entre ${-amplitude} e ${amplitude}.</p>`;
+            comparison += `<div class="explanation-block">
+                <p><strong>📏 Amplitude Alterada:</strong></p>
+                <p>Variamos apenas o parâmetro A (amplitude) para ${amplitude}. Sendo assim, a altura máxima será ${amplitude} e a profundidade ${-amplitude}.</p>
+                <p>Não há deslocamento horizontal nem vertical, apenas um "${amplitude > 1 ? 'esticamento' : 'encolhimento'}" vertical do desenho.</p>
+                <p><em>Compare:</em> ${standardFunction} oscila entre -1 e 1, mas sua função oscila entre ${-amplitude} e ${amplitude}.</p>
+            </div>`;
         }
     } else if (amplitude < 0) {
-        comparison += `<p>• <span class="highlight-change">Função invertida</span>: A função foi refletida no eixo x. Os valores positivos se tornaram negativos e vice-versa.</p>`;
-    } else {
-        comparison += `<p>• <span class="highlight-standard">Amplitude padrão</span>: A amplitude permanece 1, variando entre -1 e 1 como a função padrão.</p>`;
+        comparison += `<div class="explanation-block">
+            <p><strong>🔄 Função Invertida:</strong></p>
+            <p>Variamos apenas o sinal do parâmetro A para negativo. A altura máxima continua sendo 1 e a profundidade -1.</p>
+            <p>Não há deslocamento horizontal nem vertical, apenas uma "inversão" completa do desenho.</p>
+            <p><em>Resultado:</em> Onde ${standardFunction} tem máximos, sua função tem mínimos, e vice-versa.</p>
+        </div>`;
     }
     
-    // Análise da frequência/período
+    // Análise detalhada da frequência
     if (frequency !== 1) {
         const period = (2 * Math.PI) / Math.abs(frequency);
-        const standardPeriod = 2 * Math.PI;
-        
         if (frequency > 1) {
-            comparison += `<p>• <span class="highlight-change">Período diminuído</span>: A frequência foi multiplicada por ${frequency}, fazendo a função completar ${frequency} ciclos no mesmo espaço onde ${standardFunction} completa 1 ciclo. O período mudou de ${standardPeriod.toFixed(3)} para ${period.toFixed(3)} radianos.</p>`;
+            comparison += `<div class="explanation-block">
+                <p><strong>⚡ Frequência Aumentada:</strong></p>
+                <p>Variamos o parâmetro B (frequência) para ${frequency}. Isso faz a função "acelerar".</p>
+                <p>A amplitude permanece a mesma (${Math.abs(amplitude)}), não há deslocamentos, apenas uma "compressão" horizontal.</p>
+                <p><em>Compare:</em> ${standardFunction} completa 1 ciclo em 2π radianos, mas sua função completa ${frequency} ciclos no mesmo espaço.</p>
+                <p>O período mudou de 2π (≈6.28) para ${period.toFixed(3)} radianos - a função ficou ${frequency}x mais rápida!</p>
+            </div>`;
         } else {
-            comparison += `<p>• <span class="highlight-change">Período aumentado</span>: A frequência foi multiplicada por ${frequency}, fazendo a função completar 1 ciclo no espaço onde ${standardFunction} completaria ${1/frequency} ciclos. O período mudou de ${standardPeriod.toFixed(3)} para ${period.toFixed(3)} radianos.</p>`;
+            comparison += `<div class="explanation-block">
+                <p><strong>🐌 Frequência Diminuída:</strong></p>
+                <p>Variamos o parâmetro B (frequência) para ${frequency}. Isso faz a função "desacelerar".</p>
+                <p>A amplitude permanece a mesma (${Math.abs(amplitude)}), não há deslocamentos, apenas um "alongamento" horizontal.</p>
+                <p><em>Compare:</em> ${standardFunction} completa 1 ciclo em 2π radianos, mas sua função precisa de ${period.toFixed(3)} radianos para completar 1 ciclo.</p>
+                <p>A função ficou ${(1/frequency).toFixed(1)}x mais lenta que a padrão!</p>
+            </div>`;
         }
-    } else {
-        comparison += `<p>• <span class="highlight-standard">Período padrão</span>: O período permanece 2π radianos, igual à função padrão.</p>`;
     }
     
-    // Análise do deslocamento horizontal
+    // Análise detalhada do deslocamento horizontal
     if (phaseShift !== 0) {
         const direction = phaseShift > 0 ? 'direita' : 'esquerda';
-        comparison += `<p>• <span class="highlight-change">Deslocamento horizontal</span>: A função foi deslocada ${Math.abs(phaseShift).toFixed(3)} radianos para a ${direction}. Todos os pontos característicos (máximos, mínimos, zeros) foram movidos horizontalmente.</p>`;
-    } else {
-        comparison += `<p>• <span class="highlight-standard">Sem deslocamento horizontal</span>: A função mantém a mesma posição horizontal da função padrão.</p>`;
+        const directionSymbol = phaseShift > 0 ? '→' : '←';
+        comparison += `<div class="explanation-block">
+            <p><strong>${directionSymbol} Deslocamento Horizontal:</strong></p>
+            <p>Variamos o parâmetro C (fase) para ${-phaseShift.toFixed(3)}. Isso move toda a função horizontalmente.</p>
+            <p>A amplitude (${Math.abs(amplitude)}) e a frequência (${frequency}) permanecem inalteradas, apenas a posição horizontal muda.</p>
+            <p><em>Resultado:</em> Todos os pontos característicos (máximos, mínimos, zeros) foram deslocados ${Math.abs(phaseShift).toFixed(3)} radianos para a ${direction}.</p>
+            <p>É como se pegássemos o gráfico de ${standardFunction} e o deslizássemos horizontalmente!</p>
+        </div>`;
     }
     
-    // Análise do deslocamento vertical
+    // Análise detalhada do deslocamento vertical
     if (verticalShift !== 0) {
         const direction = verticalShift > 0 ? 'cima' : 'baixo';
-        comparison += `<p>• <span class="highlight-change">Deslocamento vertical</span>: A função foi deslocada ${Math.abs(verticalShift)} unidades para ${direction}. O eixo central da oscilação mudou de y=0 para y=${verticalShift}.</p>`;
-    } else {
-        comparison += `<p>• <span class="highlight-standard">Sem deslocamento vertical</span>: A função oscila em torno de y=0, igual à função padrão.</p>`;
+        const directionSymbol = verticalShift > 0 ? '↑' : '↓';
+        comparison += `<div class="explanation-block">
+            <p><strong>${directionSymbol} Deslocamento Vertical:</strong></p>
+            <p>Variamos o parâmetro D (deslocamento vertical) para ${verticalShift}. Isso move toda a função verticalmente.</p>
+            <p>A amplitude (${Math.abs(amplitude)}), frequência (${frequency}) e fase permanecem inalteradas.</p>
+            <p><em>Compare:</em> ${standardFunction} oscila em torno de y=0, mas sua função oscila em torno de y=${verticalShift}.</p>
+            <p>O "centro" da oscilação mudou - é como elevar ou abaixar todo o gráfico ${Math.abs(verticalShift)} unidades!</p>
+        </div>`;
     }
     
     // Resumo das transformações
-    comparison += `<p><strong>Resumo das transformações aplicadas:</strong></p>`;
-    comparison += `<p>Partindo de ${standardFunction}, aplicamos as seguintes modificações para obter ${functionText}:</p>`;
-    comparison += `<ul>`;
-    
-    if (Math.abs(amplitude) !== 1) {
-        comparison += `<li>Multiplicação por ${amplitude} (${amplitude < 0 ? 'inversão e ' : ''}alteração de amplitude)</li>`;
-    }
-    if (frequency !== 1) {
-        comparison += `<li>Multiplicação do argumento por ${frequency} (alteração de frequência)</li>`;
-    }
-    if (phaseShift !== 0) {
-        comparison += `<li>Subtração de ${phaseShift.toFixed(3)} do argumento (deslocamento horizontal)</li>`;
-    }
-    if (verticalShift !== 0) {
-        comparison += `<li>Adição de ${verticalShift} ao resultado (deslocamento vertical)</li>`;
-    }
+    comparison += `<div class="summary-block">
+        <p><strong>📋 Resumo das Transformações:</strong></p>`;
     
     if (amplitude === 1 && frequency === 1 && phaseShift === 0 && verticalShift === 0) {
-        comparison += `<li>Nenhuma transformação - função padrão</li>`;
+        comparison += `<p>✨ <em>Esta é a função trigonométrica padrão! É a base para todas as outras transformações.</em></p>`;
+    } else {
+        comparison += `<p>Partindo de ${standardFunction}, aplicamos as seguintes modificações:</p><ul>`;
+        
+        if (Math.abs(amplitude) !== 1) {
+            comparison += `<li><strong>A = ${amplitude}:</strong> ${amplitude < 0 ? 'Inversão e a' : 'A'}lteração da amplitude</li>`;
+        }
+        if (frequency !== 1) {
+            comparison += `<li><strong>B = ${frequency}:</strong> ${frequency > 1 ? 'Aceleração' : 'Desaceleração'} da função</li>`;
+        }
+        if (phaseShift !== 0) {
+            comparison += `<li><strong>C = ${-phaseShift.toFixed(3)}:</strong> Deslocamento horizontal</li>`;
+        }
+        if (verticalShift !== 0) {
+            comparison += `<li><strong>D = ${verticalShift}:</strong> Deslocamento vertical</li>`;
+        }
+        
+        comparison += `</ul>`;
+        
+        // Fórmula geral
+        comparison += `<p><strong>Fórmula geral:</strong> <code>f(x) = A*${type}(B*x + C) + D</code></p>`;
+        comparison += `<p><strong>Sua função:</strong> <code>${functionText}</code></p>`;
     }
     
-    comparison += `</ul>`;
+    comparison += `</div>`;
     
     comparisonDiv.innerHTML = comparison;
 }
 
 function showError(message) {
     const analysisDiv = document.getElementById('function-analysis');
-    analysisDiv.innerHTML = `
-        <div style="color: #ef4444; padding: 20px; background: #fef2f2; border-radius: 8px; border-left: 4px solid #ef4444;">
-            <strong>Erro:</strong> ${message}
-        </div>
-    `;
-    
     const comparisonDiv = document.getElementById('comparison-content');
-    comparisonDiv.innerHTML = `<p style="color: #6b7280;">Corrija a função para ver a comparação.</p>`;
-}
-
-
-// Funcionalidades extras para análise avançada
-
-function addAdvancedAnalysis(parsedFunction, functionText) {
-    const analysisDiv = document.getElementById('function-analysis');
-    const currentContent = analysisDiv.innerHTML;
     
-    // Adicionar seção de pontos importantes
-    const importantPoints = calculateImportantPoints(parsedFunction);
-    
-    const advancedHtml = `
-        <div class="parameter-item" style="margin-top: 20px; background: #f0f9ff; border-left-color: #0ea5e9;">
-            <div class="parameter-label">Pontos Importantes:</div>
-            <div class="parameter-description">
-                <strong>Zeros da função:</strong> x = ${importantPoints.zeros.slice(0, 3).map(x => x.toFixed(3)).join(', ')}...<br>
-                <strong>Máximos:</strong> x = ${importantPoints.maxima.slice(0, 3).map(x => x.toFixed(3)).join(', ')}...<br>
-                <strong>Mínimos:</strong> x = ${importantPoints.minima.slice(0, 3).map(x => x.toFixed(3)).join(', ')}...
+    if (analysisDiv) {
+        analysisDiv.innerHTML = `
+            <div class="error-message">
+                <div class="error-icon">⚠️</div>
+                <div class="error-text">
+                    <strong>Erro:</strong> ${message}
+                    <br><br>
+                    <strong>Exemplos válidos:</strong><br>
+                    • sen(x), cos(x)<br>
+                    • 2*sen(x), -cos(x)<br>
+                    • sen(2x), cos(x/2)<br>
+                    • sen(x-1)+2
+                </div>
             </div>
-        </div>
-        
-        <div class="parameter-item" style="background: #f0fdf4; border-left-color: #22c55e;">
-            <div class="parameter-label">Dica Educativa:</div>
-            <div class="parameter-description">
-                ${generateEducationalTip(parsedFunction)}
-            </div>
-        </div>
-    `;
+        `;
+    }
     
-    analysisDiv.innerHTML = currentContent + advancedHtml;
+    if (comparisonDiv) {
+        comparisonDiv.innerHTML = '<p>Corrija a função para ver a comparação.</p>';
+    }
 }
 
-function calculateImportantPoints(parsedFunction) {
-    const { type, amplitude, frequency, phaseShift, verticalShift } = parsedFunction;
-    
-    const zeros = [];
-    const maxima = [];
-    const minima = [];
-    
-    // Calcular alguns pontos importantes no intervalo [-2π, 2π]
-    for (let k = -4; k <= 4; k++) {
-        if (type === 'sin') {
-            // Zeros do seno: x = kπ/frequency + phaseShift
-            zeros.push(k * Math.PI / frequency + phaseShift);
-            
-            // Máximos do seno: x = (π/2 + 2kπ)/frequency + phaseShift
-            maxima.push((Math.PI/2 + 2*k*Math.PI) / frequency + phaseShift);
-            
-            // Mínimos do seno: x = (3π/2 + 2kπ)/frequency + phaseShift
-            minima.push((3*Math.PI/2 + 2*k*Math.PI) / frequency + phaseShift);
-        } else {
-            // Zeros do cosseno: x = (π/2 + kπ)/frequency + phaseShift
-            zeros.push((Math.PI/2 + k*Math.PI) / frequency + phaseShift);
-            
-            // Máximos do cosseno: x = (2kπ)/frequency + phaseShift
-            maxima.push((2*k*Math.PI) / frequency + phaseShift);
-            
-            // Mínimos do cosseno: x = (π + 2kπ)/frequency + phaseShift
-            minima.push((Math.PI + 2*k*Math.PI) / frequency + phaseShift);
-        }
-    }
-    
-    return {
-        zeros: zeros.filter(x => x >= -2*Math.PI && x <= 2*Math.PI).sort((a, b) => a - b),
-        maxima: maxima.filter(x => x >= -2*Math.PI && x <= 2*Math.PI).sort((a, b) => a - b),
-        minima: minima.filter(x => x >= -2*Math.PI && x <= 2*Math.PI).sort((a, b) => a - b)
-    };
-}
-
-function generateEducationalTip(parsedFunction) {
-    const { type, amplitude, frequency, phaseShift, verticalShift } = parsedFunction;
-    
-    const tips = [];
-    
-    if (Math.abs(amplitude) > 1) {
-        tips.push(`A amplitude ${Math.abs(amplitude)} significa que a função oscila ${Math.abs(amplitude)}x mais intensamente que a função padrão.`);
-    } else if (Math.abs(amplitude) < 1 && amplitude !== 0) {
-        tips.push(`A amplitude ${Math.abs(amplitude)} significa que a função oscila com menor intensidade que a função padrão.`);
-    }
-    
-    if (amplitude < 0) {
-        tips.push(`O sinal negativo inverte a função: onde antes subia, agora desce, e vice-versa.`);
-    }
-    
-    if (frequency > 1) {
-        tips.push(`A frequência ${frequency} faz a função completar ${frequency} ciclos no espaço de um ciclo padrão - ela "acelera".`);
-    } else if (frequency < 1 && frequency > 0) {
-        tips.push(`A frequência ${frequency} faz a função completar apenas ${frequency} ciclos no espaço de um ciclo padrão - ela "desacelera".`);
-    }
-    
-    if (phaseShift !== 0) {
-        const direction = phaseShift > 0 ? 'direita' : 'esquerda';
-        tips.push(`O deslocamento horizontal move toda a função ${Math.abs(phaseShift).toFixed(2)} radianos para a ${direction}.`);
-    }
-    
-    if (verticalShift !== 0) {
-        const direction = verticalShift > 0 ? 'cima' : 'baixo';
-        tips.push(`O deslocamento vertical move o "centro" da oscilação ${Math.abs(verticalShift)} unidades para ${direction}.`);
-    }
-    
-    if (tips.length === 0) {
-        return `Esta é a função trigonométrica padrão! É a base para todas as outras transformações.`;
-    }
-    
-    return tips.join(' ');
-}
-
-// Atualizar a função plotFunction para incluir análise avançada
-const originalPlotFunction = plotFunction;
-plotFunction = function(functionText) {
-    try {
-        currentFunction = functionText;
-        
-        // Parse da função
-        const parsedFunction = parseFunction(functionText);
-        
-        // Gerar dados para o gráfico
-        const data = generatePlotData(parsedFunction);
-        
-        // Criar/atualizar gráfico
-        createChart(data, functionText);
-        
-        // Analisar função
-        analyzeFunction(parsedFunction, functionText);
-        
-        // Adicionar análise avançada
-        addAdvancedAnalysis(parsedFunction, functionText);
-        
-        // Gerar comparação
-        generateComparison(parsedFunction, functionText);
-        
-    } catch (error) {
-        console.error('Erro ao plotar função:', error);
-        showError('Erro ao interpretar a função. Verifique a sintaxe e tente novamente.');
-    }
-};
-
-// Função para destacar mudanças no gráfico
-function highlightChanges(parsedFunction) {
-    const { amplitude, frequency, phaseShift, verticalShift } = parsedFunction;
-    
-    let changes = [];
-    
-    if (Math.abs(amplitude) !== 1) {
-        changes.push(`amplitude ${amplitude}`);
-    }
-    if (frequency !== 1) {
-        changes.push(`frequência ${frequency}`);
-    }
-    if (phaseShift !== 0) {
-        changes.push(`fase ${phaseShift > 0 ? '+' : ''}${phaseShift.toFixed(2)}`);
-    }
-    if (verticalShift !== 0) {
-        changes.push(`vertical ${verticalShift > 0 ? '+' : ''}${verticalShift}`);
-    }
-    
-    return changes.length > 0 ? changes.join(', ') : 'função padrão';
-}
-
-// Adicionar validação de entrada mais robusta
-function validateFunction(functionText) {
-    // Lista de padrões válidos
-    const validPatterns = [
-        /^-?\d*\.?\d*\*?(sen|cos|sin)\([^)]+\)([+-]\d*\.?\d*)?$/i,
-        /^(sen|cos|sin)\([^)]+\)([+-]\d*\.?\d*)?$/i,
-        /^-?\d*\.?\d*\*(sen|cos|sin)\([^)]+\)([+-]\d*\.?\d*)?$/i
-    ];
-    
-    const normalized = functionText.toLowerCase().replace(/\s+/g, '');
-    
-    return validPatterns.some(pattern => pattern.test(normalized));
-}
-
-// Melhorar o tratamento de erros
-function showError(message) {
-    const analysisDiv = document.getElementById('function-analysis');
-    analysisDiv.innerHTML = `
-        <div style="color: #ef4444; padding: 20px; background: #fef2f2; border-radius: 8px; border-left: 4px solid #ef4444;">
-            <strong>⚠️ Erro:</strong> ${message}
-            <br><br>
-            <strong>Exemplos válidos:</strong>
-            <ul style="margin-top: 10px; padding-left: 20px;">
-                <li><code>sen(x)</code> ou <code>sin(x)</code></li>
-                <li><code>cos(x)</code></li>
-                <li><code>2*sen(x)</code></li>
-                <li><code>sen(2x)</code></li>
-                <li><code>sen(x-1)+2</code></li>
-                <li><code>-3*cos(0.5x+1)-1</code></li>
-            </ul>
-        </div>
-    `;
-    
-    const comparisonDiv = document.getElementById('comparison-content');
-    comparisonDiv.innerHTML = `<p style="color: #6b7280;">Corrija a função para ver a comparação.</p>`;
+function clearError() {
+    // Função para limpar mensagens de erro se necessário
 }

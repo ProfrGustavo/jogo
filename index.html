@@ -6,109 +6,179 @@
     <title>Visualizador de Funções Trigonométricas</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mathjs@11.11.0/lib/browser/math.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.js"></script>
 </head>
 <body>
-    <div class="container">
-        <header class="header">
-            <h1 class="title">Visualizador de Funções Trigonométricas</h1>
-            <p class="subtitle">Explore e compreenda as transformações de seno e cosseno</p>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <h1 class="app-title">Funções Trigonométricas</h1>
+                <p class="app-subtitle">Visualize e compreenda transformações de seno e cosseno</p>
+            </div>
         </header>
 
-        <main class="main-content">
-            <div class="input-section">
-                <div class="input-group">
-                    <label for="function-input" class="input-label">Digite sua função:</label>
-                    <div class="input-container">
-                        <input 
-                            type="text" 
-                            id="function-input" 
-                            class="function-input" 
-                            placeholder="Ex: sen(2x), -cos(x+2), 3*sen(x/2-1)+2"
-                            value="sen(x)"
-                        >
-                        <button id="plot-button" class="plot-button">Plotar Gráfico</button>
+        <!-- Main Content -->
+        <main class="main-container">
+            <!-- Input Section -->
+            <section class="input-section">
+                <div class="input-card">
+                    <div class="input-header">
+                        <h2>Digite sua função</h2>
+                        <p>Use sen() ou cos() com transformações</p>
                     </div>
-                    <div class="input-help">
-                        <p><strong>Exemplos válidos:</strong></p>
-                        <ul>
-                            <li><code>sen(x)</code> - função seno padrão</li>
-                            <li><code>cos(x)</code> - função cosseno padrão</li>
-                            <li><code>2*sen(x)</code> - amplitude 2</li>
-                            <li><code>sen(2x)</code> - período π</li>
-                            <li><code>sen(x-1)</code> - deslocamento horizontal</li>
-                            <li><code>sen(x)+2</code> - deslocamento vertical</li>
-                            <li><code>-cos(3x+2)-1</code> - função complexa</li>
-                        </ul>
+                    
+                    <div class="input-controls">
+                        <div class="input-group">
+                            <input 
+                                type="text" 
+                                id="function-input" 
+                                class="function-input" 
+                                placeholder="Ex: sen(2x), -cos(x+1), 3*sen(x/2-1)+2"
+                                value="sen(x)"
+                                autocomplete="off"
+                                spellcheck="false"
+                            >
+                            <button id="plot-button" class="btn btn-primary">
+                                <span>Plotar</span>
+                            </button>
+                            <button id="clear-button" class="btn btn-secondary">
+                                <span>Limpar</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="presets-section">
+                        <h3>Exemplos rápidos:</h3>
+                        <div class="preset-grid">
+                            <button class="preset-btn" data-function="sen(x)">sen(x)</button>
+                            <button class="preset-btn" data-function="cos(x)">cos(x)</button>
+                            <button class="preset-btn" data-function="2*sen(x)">2*sen(x)</button>
+                            <button class="preset-btn" data-function="sen(2x)">sen(2x)</button>
+                            <button class="preset-btn" data-function="sen(x/2)">sen(x/2)</button>
+                            <button class="preset-btn" data-function="sen(x-1)">sen(x-1)</button>
+                            <button class="preset-btn" data-function="sen(x)+2">sen(x)+2</button>
+                            <button class="preset-btn" data-function="-cos(x)">-cos(x)</button>
+                            <button class="preset-btn" data-function="3*cos(2x-1)+1">3*cos(2x-1)+1</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Visualization Section -->
+            <section class="visualization-section">
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h2>Gráfico</h2>
+                        <div class="chart-legend">
+                            <div class="legend-item">
+                                <div class="legend-color standard"></div>
+                                <span>Função padrão</span>
+                            </div>
+                            <div class="legend-item">
+                                <div class="legend-color custom"></div>
+                                <span>Sua função</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="function-chart"></canvas>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Section -->
+            <section class="analysis-section">
+                <div class="analysis-card">
+                    <div class="card-header">
+                        <h2>Análise da Função</h2>
+                    </div>
+                    <div class="card-content">
+                        <div id="function-analysis">
+                            <p class="placeholder-text">Digite uma função para ver a análise detalhada.</p>
+                        </div>
                     </div>
                 </div>
 
-                <div class="presets-section">
-                    <h3>Funções Pré-definidas:</h3>
-                    <div class="preset-buttons">
-                        <button class="preset-btn" data-function="sen(x)">sen(x)</button>
-                        <button class="preset-btn" data-function="cos(x)">cos(x)</button>
-                        <button class="preset-btn" data-function="2*sen(x)">2*sen(x)</button>
-                        <button class="preset-btn" data-function="sen(2x)">sen(2x)</button>
-                        <button class="preset-btn" data-function="sen(x/2)">sen(x/2)</button>
-                        <button class="preset-btn" data-function="sen(x-1)">sen(x-1)</button>
-                        <button class="preset-btn" data-function="sen(x)+2">sen(x)+2</button>
-                        <button class="preset-btn" data-function="-cos(x)">-cos(x)</button>
+                <div class="comparison-card">
+                    <div class="card-header">
+                        <h2>Comparação e Explicação</h2>
+                    </div>
+                    <div class="card-content">
+                        <div id="comparison-content">
+                            <p class="placeholder-text">A comparação com a função padrão aparecerá aqui.</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+            </section>
 
-            <div class="visualization-section">
-                <div class="chart-container">
-                    <canvas id="function-chart"></canvas>
-                </div>
-                
-                <div class="analysis-panel">
-                    <div class="analysis-header">
-                        <h3>Análise da Função</h3>
+            <!-- Help Section -->
+            <section class="help-section">
+                <div class="help-card">
+                    <div class="card-header">
+                        <h2>Como usar</h2>
                     </div>
-                    <div id="function-analysis" class="analysis-content">
-                        <p>Digite uma função para ver a análise detalhada.</p>
+                    <div class="card-content">
+                        <div class="help-grid">
+                            <div class="help-item">
+                                <div class="help-number">1</div>
+                                <div class="help-text">
+                                    <h4>Digite a função</h4>
+                                    <p>Use sen() ou cos() com transformações como 2*sen(x) ou cos(x+1)</p>
+                                </div>
+                            </div>
+                            <div class="help-item">
+                                <div class="help-number">2</div>
+                                <div class="help-text">
+                                    <h4>Visualize o gráfico</h4>
+                                    <p>Observe como sua função (azul) se compara com a padrão (cinza tracejado)</p>
+                                </div>
+                            </div>
+                            <div class="help-item">
+                                <div class="help-number">3</div>
+                                <div class="help-text">
+                                    <h4>Entenda as transformações</h4>
+                                    <p>Leia a análise detalhada e as explicações das mudanças</p>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            <div class="comparison-section">
-                <div class="comparison-header">
-                    <h3>Comparação com a Função Padrão</h3>
+                <div class="transformations-card">
+                    <div class="card-header">
+                        <h2>Transformações Suportadas</h2>
+                    </div>
+                    <div class="card-content">
+                        <div class="transformations-grid">
+                            <div class="transformation-item">
+                                <h4>Amplitude</h4>
+                                <code>A*sen(x)</code>
+                                <p>Altera a altura máxima da função</p>
+                            </div>
+                            <div class="transformation-item">
+                                <h4>Frequência</h4>
+                                <code>sen(Bx)</code>
+                                <p>Altera quantos ciclos cabem no mesmo espaço</p>
+                            </div>
+                            <div class="transformation-item">
+                                <h4>Fase</h4>
+                                <code>sen(x-C)</code>
+                                <p>Move a função horizontalmente</p>
+                            </div>
+                            <div class="transformation-item">
+                                <h4>Vertical</h4>
+                                <code>sen(x)+D</code>
+                                <p>Move a função para cima ou baixo</p>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div id="comparison-content" class="comparison-content">
-                    <p>A comparação aparecerá aqui após plotar uma função.</p>
-                </div>
-            </div>
-
-            <div class="info-section">
-                <div class="info-card">
-                    <h3>Como usar</h3>
-                    <ol>
-                        <li>Digite uma função trigonométrica no campo acima</li>
-                        <li>Use <code>sen()</code> para seno e <code>cos()</code> para cosseno</li>
-                        <li>Clique em "Plotar Gráfico" ou pressione Enter</li>
-                        <li>Observe o gráfico e leia a análise detalhada</li>
-                        <li>Compare com a função padrão destacada em cinza</li>
-                    </ol>
-                </div>
-
-                <div class="info-card">
-                    <h3>Transformações Suportadas</h3>
-                    <ul>
-                        <li><strong>Amplitude:</strong> <code>A*sen(x)</code> - altera a altura máxima</li>
-                        <li><strong>Período:</strong> <code>sen(Bx)</code> - altera a frequência</li>
-                        <li><strong>Deslocamento horizontal:</strong> <code>sen(x-C)</code> - move para direita/esquerda</li>
-                        <li><strong>Deslocamento vertical:</strong> <code>sen(x)+D</code> - move para cima/baixo</li>
-                        <li><strong>Reflexão:</strong> <code>-sen(x)</code> - inverte o gráfico</li>
-                    </ul>
-                </div>
-            </div>
+            </section>
         </main>
 
-        <footer class="footer">
+        <!-- Footer -->
+        <footer class="app-footer">
             <p>&copy; 2025 Visualizador de Funções Trigonométricas</p>
         </footer>
     </div>
